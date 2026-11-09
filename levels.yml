@@ -1,0 +1,45 @@
+name: Refresh GEX levels
+
+on:
+  schedule:
+    # Every 30 minutes, 13:00–21:30 UTC, Monday–Friday.
+    # That covers the US cash session in both EST and EDT.
+    # GitHub's scheduler is best-effort and often runs a few minutes late.
+    - cron: "0,30 13-21 * * 1-5"
+  workflow_dispatch:        # adds a "Run workflow" button for manual runs
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gex-levels
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate levels
+        run: python generate_pine.py
+
+      - name: Commit if anything changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add levels
+          if git diff --staged --quiet; then
+            echo "No change in levels; nothing to commit."
+          else
+            git commit -m "Refresh GEX levels $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
